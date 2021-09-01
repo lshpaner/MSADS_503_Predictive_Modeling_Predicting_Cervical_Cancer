@@ -24,17 +24,16 @@ Our objective is to use data collected regarding the conditions under which a co
 * Excel
 
 ## Project Description
-Data collected by a survey regarding the conditions under which someone either accepted or rejected a coupon were assessed and processed to create an optimal algorithm to determine whether a candidate should be offered a coupon in order to optimize coupon acceptance. 
+Data collected from biopsy results (positive or negative) from cervical cancer screening pool from a Venezuelan inpatient clinic. Multiple machine learning algorithms were implemented to determine whether individuals are more likely to be helathy (cancer free) or unhealthy(with positive biopsy results).
 
 ## ROC Comparison for Models
-![image](https://user-images.githubusercontent.com/74040889/131297526-9f30ec80-d5e8-4799-bc44-feaad400a578.png)
+![image](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_Predicting_Cervical_Cancer/blob/main/ROC_Curves.png)
 
 ## Presentations and projects
-* [Project Write-up](https://github.com/lshpaner/MSADS_504_Machine_Learning_In_Vehicle_Marketing_Engagement/blob/main/In_Vehicle_Coupon_Marketing.pdf)
-* [Python Pre-Processing File](https://github.com/lshpaner/MSADS_504_Machine_Learning_In_Vehicle_Marketing_Engagement/blob/main/Preprocessing.ipynb)
-* [Python Models File](https://github.com/lshpaner/MSADS_504_Machine_Learning_In_Vehicle_Marketing_Engagement/blob/main/Models.ipynb)
+* [Project Write-up](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_Predicting_Cervical_Cancer/blob/main/Predicting_Cervical_Cancer.pdf)
+* [R Code](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_Predicting_Cervical_Cancer/blob/main/Final_Project_MSADS503.md)
 
 ## Original Data
-* [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/in-vehicle+coupon+recommendation)  
+* [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Cervical+cancer+%28Risk+Factors%29)  
 
-* [Dataset](https://archive.ics.uci.edu/ml/machine-learning-databases/00603/in-vehicle-coupon-recommendation.csv)
+* [Dataset](https://archive.ics.uci.edu/ml/machine-learning-databases/00383/risk_factors_cervical_cancer.csv)
