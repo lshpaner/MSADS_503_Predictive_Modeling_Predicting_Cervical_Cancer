@@ -1,4 +1,4 @@
-# MSADS503_503_Applied Predictive Modeling
+# MSADS_503_503_Applied Predictive Modeling
 # Predicting Cervical Cancer
 ## Completed: 06/12/2021
 
@@ -19,8 +19,7 @@ Our objective is to use data collected regarding the conditions under which a co
 * Data modeling metrics
 
 ### Technologies
-* Python (Jupyter Notebooks)
-* Powerpoint
+* R Programming (RStudio)
 * Word
 * Excel
 
