@@ -5,7 +5,7 @@
 ![image](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_predicting_cervical_cancer/blob/main/featured.png)
 
 ## Project Objective
-Our objective is to use data collected regarding the conditions under which a coupon was either accepted or rejected by a survey-respondent to create a model to help determine whether a someone should be offered a coupon based on the likelihood that they accept it.
+Our objective is to determine likelihood of biopsy results returning positive vs. negative results visa vie health screening data sample, thereby creating an ensuing model(s) to help determine the efficacy of repeated tests in a similar fashion.
 
 ### Partners
 * [Kiran Singh](https://github.com/kiransingh789)
