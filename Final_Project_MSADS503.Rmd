@@ -79,7 +79,7 @@ cervdat <- round(cerv_imputed, 0) #reassign back to original dataframe
 ## Examining Degenerate Distributions (Near Zero Variance Columns)
 
 ```{r}
-degen_cerv_names <- nearZeroVar(cervdat, names = TRUE); degen_cerv_names 
+degen_cerv_names <- nearZeroVar(cervdat, names = TRUE); degen_cerv_names
 degen_cerv <- nearZeroVar(cervdat); degen_cerv 
 ```
 
