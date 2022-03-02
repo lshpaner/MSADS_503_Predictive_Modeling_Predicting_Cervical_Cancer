@@ -22,7 +22,7 @@ library(MLmetrics)
 # Reading in and Inspecting the Dataset 
 #read in the cervical cancer dataset
 cervdat <- read.csv("risk_factors_cervical_cancer.csv", header=TRUE, 
-                     stringsAsFactors = FALSE)
+                    stringsAsFactors = FALSE)
 cervdat <- as.data.frame(apply(cervdat, 2, as.integer))
 
 # remove unused columns
@@ -49,7 +49,7 @@ cervdat <- round(cerv_imputed, 0) #reassign back to original dataframe
 
 ## Examining Degenerate Distributions (Near Zero Variance Columns)
 
-degen_cerv_names <- nearZeroVar(cervdat, names = TRUE); degen_cerv_names 
+degen_cerv_names <- nearZeroVar(cervdat, names = TRUE); degen_cerv_names
 degen_cerv <- nearZeroVar(cervdat); degen_cerv 
 
 degen_cerv <- data.frame(cervdat[6],cervdat[7],
@@ -63,22 +63,21 @@ degen_cerv <- data.frame(cervdat[6],cervdat[7],
                          cervdat[28],cervdat[29], 
                          cervdat[30],cervdat[31])
 par(mfrow = c(1, 4))
-  for (i in 1:ncol(degen_cerv)) {
-              hist(degen_cerv[,i], xlab = names(degen_cerv[i]), 
-                                   main = paste(names(degen_cerv[i]), ""), 
-                                   col="gray18")
-    }
+for (i in 1:ncol(degen_cerv)) {
+  hist(degen_cerv[,i], xlab = names(degen_cerv[i]), 
+       main = paste(names(degen_cerv[i]), ""), 
+       col="gray18")
+}
 
 # Determine Near Zero Variance Columns
 nearzero_cerv <- nearZeroVar(cervdat) # assign to new variable
 cervdat <- cervdat[,-nearzero_cerv] # Remove Near Zero Variance Columns
 # Inspect new dimensions of dataset
 cat("\n There were", length(nearzero_cerv), 
-    "near zero variance columns.", "\n New Churn Data Dimensions:", 
+    "near zero variance columns.", "\n New Data Dimensions:", 
     dim(cervdat)) 
 
 # Exploratory Data Analysis (EDA)
-
 # plot the age distribution of the dataset
 ggplot(cervdat, aes(Age) ) + 
   geom_histogram(binwidth = 10, color="white") +
@@ -89,13 +88,12 @@ ggplot(cervdat, aes(Age) ) +
 summary(cervdat$Age)
 
 # From the positively skewed distribution (histogram) plot and summary statistics, 
-# the median age of females in this dataset is 25, whereas the mean is 26.82. The 
-# lowest age in this dataset is 13, and the maximum is 84. All ages are represented herein.
-
+# the median age of females in this dataset is 25, whereas the mean is 26.82. 
+# The lowest age in this dataset is 13, and the maximum is 84. All ages are represented herein.
 cervdat[cervdat$Age >= 13 & cervdat$Age <= 17, "age_group"] <- "13-17"
 cervdat[cervdat$Age >= 18 & cervdat$Age <= 30, "age_group"] <- "18-21"
 cervdat[cervdat$Age >= 22 & cervdat$Age <= 30, "age_group"] <- "22-30"
-cervdat[cervdat$Age >= 31 & cervdat$Age <= 40, "age_group"] <- "31-42"
+cervdat[cervdat$Age >= 31 & cervdat$Age <= 40, "age_group"] <- "31-40"
 cervdat[cervdat$Age >= 41 & cervdat$Age <= 50, "age_group"] <- "41-50"
 cervdat[cervdat$Age >= 51 & cervdat$Age <= 60, "age_group"] <- "51-60"
 cervdat[cervdat$Age >= 61 & cervdat$Age <= 70, "age_group"] <- "61-70"
@@ -105,22 +103,22 @@ cervdat[cervdat$Age >= 81 & cervdat$Age <= 90, "age_group"] <- "81-90"
 ggplot(cervdat) + geom_bar(aes(age_group))+ labs(x="Age of Female", y="Count") + 
   ggtitle("Distribution of Female Patients by Age Group") + theme_bw()
 
-#Contingency Table - Age by Response Type: by Columns
+# Contingency Table - Age by Response Type: by Columns
 biop_results <- factor(cervdat$Biopsy, levels=c(0, 1),labels=c('Healthy','Cancer'))
 contingency_table <- table(biop_results, cervdat$age_group)
-contingency_table_col <- addmargins(A = contingency_table, FUN = list(total = sum),
-                                  quiet = TRUE); contingency_table_col
 
+contingency_table_col <- addmargins(A = contingency_table, FUN = list(total = sum))
+                                    
 ggplot(cervdat,aes(fct_infreq(age_group)))+geom_bar(stat="count",aes(fill=biop_results))+
 scale_fill_manual(values=c('#00BFC4','#F8766D')) + labs(x = "Age Group", y = "Count")+
 ggtitle("Age Group by Biopsy Results: (Healthy or Cancer)")+theme_bw()
 
 
-ggplot(cervdat, aes(age_group)) + geom_bar(aes(fill = biop_results),
-       position = "fill") + labs(x = "Age", y = "Frequency")+
-       scale_fill_manual(values=c('#00BFC4','#F8766D'))+
-ggtitle("Age Group by Biopsy Results: (Healthy or Cancer) - Normalized")+theme_bw()
 
+ggplot(cervdat, aes(age_group)) + geom_bar(aes(fill = biop_results),
+                                           position = "fill") + labs(x = "Age Group", y = "Frequency")+
+  scale_fill_manual(values=c('#00BFC4','#F8766D'))+
+  ggtitle("Age Group by Biopsy Results: (Healthy or Cancer) - Normalized")+theme_bw()
 
 counts <- table(biop_results); par(las=2); par(mar=c(5,8,4,2))
 barplot(counts, main = "Biopsy Results by Class", horiz = TRUE,
@@ -129,40 +127,44 @@ counts
 
 corr_cerv <- cor(cervdat[c(1:12)])
 corrplot(corr_cerv, method="color", col=colorRampPalette(c("yellow","white",
-    "orange"))(200), addCoef.col = "black", tl.col="black", tl.srt=50)
+                                                           "orange"))(200), addCoef.col = "black", tl.col="black", tl.srt=50)
 
 highCorr_names <- findCorrelation(cor(cervdat[c(1:12)]), cutoff = 0.75, 
                                   names = TRUE); highCorr_names
 highCorr <- findCorrelation(cor(cervdat[c(1:12)]), cutoff = 0.75)
 cat("\n There are", length(highCorr_names), "highly correlated predictors. \n \n")
 
+
 pred_cerv <- cervdat$Biopsy
 corrcerv_response <- cor(cervdat[c(1:12)], pred_cerv); corrcerv_response
+
 
 max_cerv <- max(corrcerv_response[,1]) # max
 second_cerv <- Rfast::nth(corrcerv_response[,1], 2, descending = T) # 2nd max
 third_cerv <- Rfast::nth(corrcerv_response[,1], 3, descending = T) # 3rd max
 
+
 # Class Imbalance and Correlation
 ## Addressing the Class Imbalance Problem 
-
 # Inspecting the biopsy target variable yielded findings commensurate with a class 
 # imbalance scenario. 803 females were found to be healthy post biopsy; whereas, 
 # only 55 had signs of cancer. Proceeding with any further analytics (i.e., model building) 
-# without addressing this critical dilemma would hamper our results. Therefore, we perform 
-# down-sampling to "randomly subset all the classes in the training set so that their class 
-# frequencies match the least prevalent class. For example, suppose that 80\% of the training
-# set samples are the first class and the remaining 20\% are in the second class. 
-# Down-sampling would randomly sample the first class to be the same size as the second class
-# (so that only 40\% of the total training set is used to fit the model)" () 
+# without addressing this critical dilemma would hamper our results. Therefore, 
+# we perform down-sampling to "randomly subset all the classes in the training 
+# set so that their class frequencies match the least prevalent class. For example, 
+# suppose that 80\% of the training set samples are the first class and the remaining 
+# 20\% are in the second class. Down-sampling would randomly sample the first class to 
+# be the same size as the second class (so that only 40\% of the total training set 
+# is used to fit the model)" () }
 
 ## Addressing Between Predictor Relationships and Predictor vs. Response Relationships
 # Two highly correlated predictors were identified (STDs and STDs.condylomatosis). 
 # They were subsequently removed. Examining the relationship between the predictors 
-# and the biopsy response itself, few variables present strong correlation coefficients
-# $r$. To this end, the three highest relationships are observed in STDs vs. biopsy results 
-# `r max_cerv`, STDs..Number.ofsiagnosis vs. biopsy results (`r second_cerv `), and Hormonal.
-# Contraceptives..years vs. biopsy results (`r third_cerv `).}
+# and the biopsy response itself, few variables present strong correlation coefficients $r$. 
+# To this end, the three highest relationships are observed in STDs vs. biopsy results
+# `r max_cerv`, STDs..Number.ofsiagnosis vs. biopsy results (`r second_cerv `), 
+# and Hormonal.Contraceptives..years vs. biopsy results (`r third_cerv `).}
+
 
 # remove highly correlated predictors (predictors with predictors)
 cervdat <- cervdat[,-highCorr]
@@ -198,7 +200,7 @@ table1 %>% pander(style = "simple",
 
 # Set up (binarize) the response (dependent variable: Biopsy)
 cervdat$Biopsy <- factor(cervdat$Biopsy, levels = c(0, 1), 
-                          labels=c('Healthy', 'Cancer'))
+                         labels=c('Healthy', 'Cancer'))
 
 cerv_predictors <- cervdat[c(-11, -12)]
 cerv_response <- cervdat$Biopsy
@@ -217,9 +219,9 @@ cat("\n Training Dimensions:",dim(train_cerv),
     "\n Testing Dimensions:", dim(test_cerv), "\n",
     "\n Confirming Train_Test Split Percentages:", "\n",
     "\n Training Dimensions Percentage:", round(length(train_cerv[,1])/
-      (length(cervdat[,1])),2),
+                                                  (length(cervdat[,1])),2),
     "\n Testing Dimensions Percentage:", round(length(test_cerv[,1])/
-      (length(cervdat[,1])),2))
+                                                 (length(cervdat[,1])),2))
 
 #ctrl params
 ctrl_cerv <- trainControl(method="LGOCV", summaryFunction = twoClassSummary,
@@ -230,7 +232,7 @@ ctrl_cerv <- trainControl(method="LGOCV", summaryFunction = twoClassSummary,
 
 set.seed(222)
 cerv_glm <- caret::train(train_cerv, train_biopsy, method = "glm", trControl = ctrl_cerv,
-                  preProcess=c("center", "scale"), metric="ROC")
+                         preProcess=c("center", "scale"), metric="ROC")
 cerv_glm
 
 cerv_glm.predictions <- predict(cerv_glm, cerv_predictors, type = "prob")
@@ -243,11 +245,12 @@ cat('cerv_predictors glm AUC:', cerv_glm.auc, "\n", "\n")
 cerv_pred_glm <- predict(cerv_glm, test_cerv)
 confusionMatrix(cerv_pred_glm, test_biopsy)
 
+
 ## Linear Discriminant Analysis (LDA)
 
 set.seed(222)
 cerv_lda <- caret::train(train_cerv, train_biopsy, method = "lda", trControl = ctrl_cerv,
-                  preProcess=c("center", "scale"), metric="ROC")
+                         preProcess=c("center", "scale"), metric="ROC")
 cerv_lda
 
 cerv_lda.predictions <- predict(cerv_lda, cerv_predictors, type = "prob")
@@ -261,12 +264,11 @@ cerv_pred_lda <- predict(cerv_lda, test_cerv)
 confusionMatrix(cerv_pred_lda, test_biopsy)
 
 ## Mixture Discriminant Analysis (MDA)
-
 set.seed(222)
 mdaGrid <- expand.grid(.subclasses = 1:8)
 cerv_mda <- train(train_cerv, train_biopsy, method = "mda",
-                   preProc = c("center", "scale"), tuneGrid = mdaGrid,
-                   metric = "ROC", trControl = ctrl_cerv)
+                  preProc = c("center", "scale"), tuneGrid = mdaGrid,
+                  metric = "ROC", trControl = ctrl_cerv)
 cerv_mda
 
 cerv_mda.predictions <- predict(cerv_mda, cerv_predictors, type = "prob")
@@ -285,12 +287,12 @@ set.seed(222)
 plsGrid = expand.grid(.ncomp = 1:10)
 # Train a PLSDA - Partial Least Squares Discriminant Analysis Model
 cerv_plsda <- train(train_cerv, train_biopsy, method = "pls", tuneGrid = plsGrid,
-                   preProc = c("center","scale"), metric = "ROC", trControl = ctrl_cerv)
+                    preProc = c("center","scale"), metric = "ROC", trControl = ctrl_cerv)
 cerv_plsda
 
 cerv_plsda.predictions <- predict(cerv_plsda, cerv_predictors, type = "prob")
 cerv_plsda.rocCurve <- pROC::roc(response = cerv_response, 
-                               predictor = cerv_plsda.predictions[,1])
+                                 predictor = cerv_plsda.predictions[,1])
 cerv_plsda.auc = cerv_plsda.rocCurve$auc[1]
 cat('cerv_predictors plsda AUC:', cerv_plsda.auc, "\n", "\n")
 
@@ -298,12 +300,13 @@ cat('cerv_predictors plsda AUC:', cerv_plsda.auc, "\n", "\n")
 cerv_pred_plsda <- predict(cerv_plsda, test_cerv)
 confusionMatrix(cerv_pred_plsda, test_biopsy)
 
+
 ## Nearest Shrunken Centroids (NSC)
 nscGrid <- data.frame(.threshold = 0:10)
 set.seed(222)
 cerv_nsc <- train(train_cerv, train_biopsy, method = "pam",
-                   preProc = c("center", "scale"), tuneGrid = nscGrid,
-                   metric = "ROC", trControl = ctrl_cerv)
+                  preProc = c("center", "scale"), tuneGrid = nscGrid,
+                  metric = "ROC", trControl = ctrl_cerv)
 cerv_nsc
 
 cerv_nsc.predictions <- predict(cerv_nsc, cerv_predictors, type = "prob")
@@ -316,6 +319,7 @@ cat('cerv_predictors NSC AUC:', cerv_nsc.auc, "\n", "\n")
 cerv_pred_nsc <- predict(cerv_nsc, test_cerv)
 confusionMatrix(cerv_pred_nsc, test_biopsy)
 
+
 ## Neural Network
 set.seed(222)
 nnetGrid <- expand.grid(size=1:3, decay=c(0,0.1,1,2))
@@ -327,7 +331,7 @@ cerv_nnet
 
 cerv_nnet.predictions <- predict(cerv_nnet, cerv_predictors, type = "prob")
 cerv_nnet.rocCurve <- pROC::roc(response = cerv_response, 
-                               predictor = cerv_nnet.predictions[,1])
+                                predictor = cerv_nnet.predictions[,1])
 cerv_nnet.auc = cerv_nnet.rocCurve$auc[1]
 cat('cerv_predictors mda AUC:', cerv_nnet.auc, "\n", "\n")
 
@@ -345,7 +349,7 @@ cerv_glmnet <- caret::train(train_cerv, y = train_biopsy, method = "glmnet",
 
 cerv_glmnet.predictions <- predict(cerv_glmnet, cerv_predictors, type = "prob")
 cerv_glmnet.rocCurve <- pROC::roc(response = cerv_response,
-                               predictor = cerv_glmnet.predictions[,1])
+                                  predictor = cerv_glmnet.predictions[,1])
 cerv_glmnet.auc = cerv_glmnet.rocCurve$auc[1]
 cat('cerv_predictors GLMNET AUC:', cerv_glmnet.auc, "\n", "\n")
 # Predict on testing set
@@ -355,16 +359,17 @@ confusionMatrix(cerv_pred_glmnet, test_biopsy)
 ## Random Forest
 set.seed(222)
 cerv_rf <- caret::train(train_cerv, y = train_biopsy, method = "rf",
-trControl = ctrl_cerv, preProc = c("center", "scale"), metric = "ROC")
+                        trControl = ctrl_cerv, preProc = c("center", "scale"), metric = "ROC")
 cerv_rf
 cerv_rf.predictions <- predict(cerv_rf, cerv_predictors, type = "prob")
 cerv_rf.rocCurve <- pROC::roc(response = cerv_response,
-                               predictor = cerv_rf.predictions[,1])
+                              predictor = cerv_rf.predictions[,1])
 cerv_rf.auc = cerv_rf.rocCurve$auc[1]
 cat('cerv_predictors Random Forest AUC:', cerv_rf.auc, "\n", "\n")
 # Predict on testing set
 cerv_pred_rf <- predict(cerv_rf, test_cerv)
 confusionMatrix(cerv_pred_rf, test_biopsy)
+
 
 ## K - Nearest Neighbors (KNN) 
 set.seed(222)
@@ -385,18 +390,19 @@ confusionMatrix(cerv_pred_knn, test_biopsy)
 ## Naive Bayes 
 set.seed(222)
 cerv_nb <- caret::train(train_cerv, train_biopsy, method = "nb", trControl = ctrl_cerv,
-                  preProcess=c("center", "scale"), metric="ROC")
+                        preProcess=c("center", "scale"), metric="ROC")
 cerv_nb
 
 cerv_nb.predictions <- predict(cerv_nb, cerv_predictors, type = "prob")
 cerv_nb.rocCurve <- pROC::roc(response = cerv_response, 
-                               predictor = cerv_nb.predictions[,1])
+                              predictor = cerv_nb.predictions[,1])
 cerv_nb.auc = cerv_nb.rocCurve$auc[1]
 cat('cerv_predictors lda AUC:', cerv_nb.auc, "\n", "\n")
 
 # Predict on testing set
 cerv_pred_nb <- predict(cerv_nb, test_cerv)
 confusionMatrix(cerv_pred_nb, test_biopsy)
+
 
 ## Support Vector Machines
 set.seed(222)
@@ -507,6 +513,7 @@ cerv_svm_accur <- Accuracy(cerv_pred_svm, test_biopsy)
 cerv_svm_sens <- sensitivity(cerv_pred_svm, test_biopsy)
 cerv_svm_spec <- specificity(cerv_pred_svm, test_biopsy)
 
+
 cerv_models <- c("Generalized Linear Model","Linear Discriminant Analysis",
                  "Mixture Discriminant Analysis",
                  "PLSDA",
@@ -542,21 +549,21 @@ table3 <- data.frame(cerv_models,accutest,senstest,spectest)
 colnames(table2) <- c("Model","ROC","AUC","Sensitivity Train","Specificity Train")
 colnames(table3) <- c("Model","Accuracy Test","Sensitivity Test","Specificity Test")
 table2 %>% pander(style = "simple", split.table = Inf, justify = "left",
-                caption="Model Comparison For Train and Test")
+                  caption="Model Comparison For Train and Test")
 table3 %>% pander(style = "simple", split.table = Inf, justify = "left",
-                caption="Model Comparison For Train and Test")
+                  caption="Model Comparison For Train and Test")
 
 plot(cerv_glm.rocCurve, col = "green", 
      main = "ROC Comparison for Cervical Cancer Predictors", 
      xlab= "1 - Specificity", ylab="Sensitivity")
 legend("bottomright", legend=c("Generalized Linear Model","Linear Discriminant Analysis",
-                 "Mixture Discriminant Analysis",
-                 "Partial Least Squares Discriminant Analysis",
-                 "Nearest Shrunken Centroids","Neural Network","GLMNET","Random Forest",
-                 "K-Nearest Neighbors", "Naive Bayes", "Support Vector Machines"),
-     col=c("green","red","blue","brown","orange","darkgreen","lightseagreen","black", 
-           "deeppink", "purple","grey50"), 
-     lty=1:2, cex=0.8)
+                               "Mixture Discriminant Analysis",
+                               "Partial Least Squares Discriminant Analysis",
+                               "Nearest Shrunken Centroids","Neural Network","GLMNET","Random Forest",
+                               "K-Nearest Neighbors", "Naive Bayes", "Support Vector Machines"),
+       col=c("green","red","blue","brown","orange","darkgreen","lightseagreen","black", 
+             "deeppink", "purple","grey50"), 
+       lty=1:2, cex=0.8)
 plot(cerv_lda.rocCurve, col = "red", add = TRUE)
 plot(cerv_mda.rocCurve, col = "blue", add = TRUE)
 plot(cerv_plsda.rocCurve, col = "brown", add = TRUE)
@@ -642,6 +649,7 @@ plot(varImp(cerv_glm), top = 5, main = "Variable Importance using the GLM Model"
 plot(varImp(cerv_rf), top = 5, main = "Variable Importance using the Random Forest Model")
 plot(varImp(cerv_nb), top = 5, main = "Variable Importance using the Naive Bayes Model")
 
+
 cerv_log <- glm(train_biopsy ~., data = train_cerv, family = binomial)
 summary(cerv_log)
 coef_log <- coef(summary(cerv_log))[,'Pr(>|z|)']
@@ -653,16 +661,16 @@ min_coef_log <- Rfast::nth(coef_log, 2, descending = F) # 2nd min (first is inte
 
 # $$\hat{p}(y) = \frac{\text{exp}(b_0+b_1x_1+\cdot\cdot\cdot+b_px_p)}{1+\text{exp}(b_0+b_1x_1+\cdot\cdot\cdot+b_px_p)}$$ 
 # $$\hat{p}(y) = \frac{\text{exp}(b_0+b_1(Hormonal.Contraceptives..years.)}{1+\text{exp}(b_0+b_1(Hormonal.Contraceptives..years.)}$$
-
-
-
-
-
-
-
-
-
-
-
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 
