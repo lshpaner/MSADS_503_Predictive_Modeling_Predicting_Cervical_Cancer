@@ -27,7 +27,7 @@ Our objective is to determine likelihood of biopsy results returning positive vs
 Data collected from biopsy results (positive or negative) from cervical cancer screening pool from a Venezuelan inpatient clinic. Multiple machine learning algorithms were implemented to determine whether individuals are more likely to be healthy (cancer free) or unhealthy(with positive biopsy results).
 
 ## ROC Comparison for Models
-![image](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_Predicting_Cervical_Cancer/blob/main/ROC_Curves.png)
+![image](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_Predicting_Cervical_Cancer/blob/images/ROC_Curves.png)
 
 ## Presentations and projects
 * [Project Write-up](https://github.com/lshpaner/MSADS_503_Predictive_Modeling_Predicting_Cervical_Cancer/blob/main/Predicting_Cervical_Cancer.pdf)
