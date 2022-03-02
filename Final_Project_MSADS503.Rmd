@@ -3,10 +3,8 @@ title: "Predicting Cervical Cancer Through Biopsy Results"
 author: "Leonid Shpaner, Angela Zhang, and Kiran Singh"
 date: "June 12, 2021"
 output:
-  html_document:
-    df_print: paged
-  pdf_document: default
-urlcolor: blue
+  md_document:
+    variant: markdown_github
 ---
 
 ```{r setup, include=FALSE}
