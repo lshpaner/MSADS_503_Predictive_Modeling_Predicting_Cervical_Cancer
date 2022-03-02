@@ -1,0 +1,676 @@
+---
+title: "Predicting Cervical Cancer Through Biopsy Results"
+author: "Leonid Shpaner, Angela Zhang, and Kiran Singh"
+date: "June 12, 2021"
+---
+
+# Loading the Requisite Libraries
+
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(RANN)
+library(kernlab)
+library(corrplot)
+library(pander)
+library(tidyverse)
+library(MASS)
+library(pROC)
+library(factoextra)
+library(MLmetrics)
+
+# Reading in and Inspecting the Dataset 
+#read in the cervical cancer dataset
+cervdat <- read.csv("risk_factors_cervical_cancer.csv", header=TRUE, 
+                    stringsAsFactors = FALSE)
+cervdat <- as.data.frame(apply(cervdat, 2, as.integer))
+
+# remove unused columns
+cervdat <- subset(cervdat, select = -c(Citology, Schiller, Hinselmann))  
+str(cervdat) # inspect the dataset
+
+cat("Dimensions of dataset:", dim(cervdat)) # dimensions of dataset
+
+# Sum up all of the NA values across the whole dataset
+cat("There are", sum(is.na(cervdat)), 
+    "'NA' values in the entire dataset.", 
+    "\n \nThe following columns have 'NA' values: \n \n")
+
+# List the columns with #NA values
+list_na <- colnames(cervdat)[ apply(cervdat, 2, anyNA)]
+list_na
+
+# Preprocessing the Data
+## Imputing Missing Values by Median
+
+cerv_impute <- preProcess(cervdat[2:32], method = "medianImpute")
+cerv_imputed <- predict(cerv_impute, cervdat)
+cervdat <- round(cerv_imputed, 0) #reassign back to original dataframe
+
+## Examining Degenerate Distributions (Near Zero Variance Columns)
+
+degen_cerv_names <- nearZeroVar(cervdat, names = TRUE); degen_cerv_names
+degen_cerv <- nearZeroVar(cervdat); degen_cerv 
+
+degen_cerv <- data.frame(cervdat[6],cervdat[7],
+                         cervdat[11],cervdat[13], 
+                         cervdat[15],cervdat[16],
+                         cervdat[18],cervdat[19], 
+                         cervdat[20],cervdat[21], 
+                         cervdat[22],cervdat[23], 
+                         cervdat[24],cervdat[25], 
+                         cervdat[26],cervdat[27], 
+                         cervdat[28],cervdat[29], 
+                         cervdat[30],cervdat[31])
+par(mfrow = c(1, 4))
+for (i in 1:ncol(degen_cerv)) {
+  hist(degen_cerv[,i], xlab = names(degen_cerv[i]), 
+       main = paste(names(degen_cerv[i]), ""), 
+       col="gray18")
+}
+
+# Determine Near Zero Variance Columns
+nearzero_cerv <- nearZeroVar(cervdat) # assign to new variable
+cervdat <- cervdat[,-nearzero_cerv] # Remove Near Zero Variance Columns
+# Inspect new dimensions of dataset
+cat("\n There were", length(nearzero_cerv), 
+    "near zero variance columns.", "\n New Data Dimensions:", 
+    dim(cervdat)) 
+
+# Exploratory Data Analysis (EDA)
+# plot the age distribution of the dataset
+ggplot(cervdat, aes(Age) ) + 
+  geom_histogram(binwidth = 10, color="white") +
+  labs(x = "\n Age of Female", y = "Count \n") +
+  ggtitle("Age Distribution of Female Patients (Histogram)") + 
+  theme_bw()
+
+summary(cervdat$Age)
+
+# From the positively skewed distribution (histogram) plot and summary statistics, 
+# the median age of females in this dataset is 25, whereas the mean is 26.82. 
+# The lowest age in this dataset is 13, and the maximum is 84. All ages are represented herein.
+cervdat[cervdat$Age >= 13 & cervdat$Age <= 17, "age_group"] <- "13-17"
+cervdat[cervdat$Age >= 18 & cervdat$Age <= 30, "age_group"] <- "18-21"
+cervdat[cervdat$Age >= 22 & cervdat$Age <= 30, "age_group"] <- "22-30"
+cervdat[cervdat$Age >= 31 & cervdat$Age <= 40, "age_group"] <- "31-40"
+cervdat[cervdat$Age >= 41 & cervdat$Age <= 50, "age_group"] <- "41-50"
+cervdat[cervdat$Age >= 51 & cervdat$Age <= 60, "age_group"] <- "51-60"
+cervdat[cervdat$Age >= 61 & cervdat$Age <= 70, "age_group"] <- "61-70"
+cervdat[cervdat$Age >= 71 & cervdat$Age <= 80, "age_group"] <- "71-80"
+cervdat[cervdat$Age >= 81 & cervdat$Age <= 90, "age_group"] <- "81-90"
+
+ggplot(cervdat) + geom_bar(aes(age_group))+ labs(x="Age of Female", y="Count") + 
+  ggtitle("Distribution of Female Patients by Age Group") + theme_bw()
+
+# Contingency Table - Age by Response Type: by Columns
+biop_results <- factor(cervdat$Biopsy, levels=c(0, 1),labels=c('Healthy','Cancer'))
+contingency_table <- table(biop_results, cervdat$age_group)
+
+contingency_table_col <- addmargins(A = contingency_table, FUN = list(total = sum))
+                                    
+ggplot(cervdat,aes(fct_infreq(age_group)))+geom_bar(stat="count",aes(fill=biop_results))+
+scale_fill_manual(values=c('#00BFC4','#F8766D')) + labs(x = "Age Group", y = "Count")+
+ggtitle("Age Group by Biopsy Results: (Healthy or Cancer)")+theme_bw()
+
+
+
+ggplot(cervdat, aes(age_group)) + geom_bar(aes(fill = biop_results),
+                                           position = "fill") + labs(x = "Age Group", y = "Frequency")+
+  scale_fill_manual(values=c('#00BFC4','#F8766D'))+
+  ggtitle("Age Group by Biopsy Results: (Healthy or Cancer) - Normalized")+theme_bw()
+
+counts <- table(biop_results); par(las=2); par(mar=c(5,8,4,2))
+barplot(counts, main = "Biopsy Results by Class", horiz = TRUE,
+        names.arg = c("Healthy", "Cancer"), col=c("cornflowerblue", "brown2"))
+counts
+
+corr_cerv <- cor(cervdat[c(1:12)])
+corrplot(corr_cerv, method="color", col=colorRampPalette(c("yellow","white",
+                                                           "orange"))(200), addCoef.col = "black", tl.col="black", tl.srt=50)
+
+highCorr_names <- findCorrelation(cor(cervdat[c(1:12)]), cutoff = 0.75, 
+                                  names = TRUE); highCorr_names
+highCorr <- findCorrelation(cor(cervdat[c(1:12)]), cutoff = 0.75)
+cat("\n There are", length(highCorr_names), "highly correlated predictors. \n \n")
+
+
+pred_cerv <- cervdat$Biopsy
+corrcerv_response <- cor(cervdat[c(1:12)], pred_cerv); corrcerv_response
+
+
+max_cerv <- max(corrcerv_response[,1]) # max
+second_cerv <- Rfast::nth(corrcerv_response[,1], 2, descending = T) # 2nd max
+third_cerv <- Rfast::nth(corrcerv_response[,1], 3, descending = T) # 3rd max
+
+
+# Class Imbalance and Correlation
+## Addressing the Class Imbalance Problem 
+# Inspecting the biopsy target variable yielded findings commensurate with a class 
+# imbalance scenario. 803 females were found to be healthy post biopsy; whereas, 
+# only 55 had signs of cancer. Proceeding with any further analytics (i.e., model building) 
+# without addressing this critical dilemma would hamper our results. Therefore, 
+# we perform down-sampling to "randomly subset all the classes in the training 
+# set so that their class frequencies match the least prevalent class. For example, 
+# suppose that 80\% of the training set samples are the first class and the remaining 
+# 20\% are in the second class. Down-sampling would randomly sample the first class to 
+# be the same size as the second class (so that only 40\% of the total training set 
+# is used to fit the model)" () }
+
+## Addressing Between Predictor Relationships and Predictor vs. Response Relationships
+# Two highly correlated predictors were identified (STDs and STDs.condylomatosis). 
+# They were subsequently removed. Examining the relationship between the predictors 
+# and the biopsy response itself, few variables present strong correlation coefficients $r$. 
+# To this end, the three highest relationships are observed in STDs vs. biopsy results
+# `r max_cerv`, STDs..Number.ofsiagnosis vs. biopsy results (`r second_cerv `), 
+# and Hormonal.Contraceptives..years vs. biopsy results (`r third_cerv `).}
+
+
+# remove highly correlated predictors (predictors with predictors)
+cervdat <- cervdat[,-highCorr]
+
+
+# Principal Component Analysis (PCA)
+options(scipen=999)
+cervdat_pca <- as.matrix(cervdat[1:10])
+cervdat.pca <- prcomp(cervdat_pca, center = TRUE, scale. = TRUE)
+var_explained <- round(cervdat.pca$sdev^2/sum((cervdat.pca$sdev)^2)*100, 4)
+
+fviz_eig(cervdat.pca, main="Scree Plot of the First 10 Principal Components",
+         xlab="Principal Components", ylab = "Percent Variance Explained", 
+         barcolor = "grey", barfill = "grey",  linecolor = "blue", addlabels=T,
+         ggtheme=theme_classic())
+
+pc <- 1:10
+p_var <- c(var_explained[1], var_explained[2], var_explained[3], var_explained[4],
+           var_explained[5], var_explained[6], var_explained[7], var_explained[8],
+           var_explained[9], var_explained[10])
+p_delta <- c(var_explained[1], 
+             var_explained[1] - var_explained[2], var_explained[2] - var_explained[3],
+             var_explained[3] - var_explained[4], var_explained[4] - var_explained[5],
+             var_explained[5] - var_explained[6], var_explained[6] - var_explained[7],
+             var_explained[7] - var_explained[8], var_explained[8] - var_explained[9],
+             var_explained[9] - var_explained[10])
+table1 <- data.frame(round(pc, 2), round(p_var,2), round(p_delta,2))
+colnames(table1) <- c("Principal Component","Percent Variance","Percent Change (Delta)")
+table1 %>% pander(style = "simple", 
+                  caption = "Percent Variance and Change by Principal Component")
+
+# Create a Data Partition and Address Class Imbalance Problem
+
+# Set up (binarize) the response (dependent variable: Biopsy)
+cervdat$Biopsy <- factor(cervdat$Biopsy, levels = c(0, 1), 
+                         labels=c('Healthy', 'Cancer'))
+
+cerv_predictors <- cervdat[c(-11, -12)]
+cerv_response <- cervdat$Biopsy
+
+set.seed(222)
+# Being mindful of class imbalances, dataset is partitioned as follows:
+cerv_part <- createDataPartition(cerv_response, p = 0.8, list = FALSE)
+
+train_cerv <- cerv_predictors[cerv_part,]
+test_cerv <- cerv_predictors[-cerv_part,]
+
+train_biopsy <- cerv_response[cerv_part]
+test_biopsy <- cerv_response[-cerv_part]
+
+cat("\n Training Dimensions:",dim(train_cerv),
+    "\n Testing Dimensions:", dim(test_cerv), "\n",
+    "\n Confirming Train_Test Split Percentages:", "\n",
+    "\n Training Dimensions Percentage:", round(length(train_cerv[,1])/
+                                                  (length(cervdat[,1])),2),
+    "\n Testing Dimensions Percentage:", round(length(test_cerv[,1])/
+                                                 (length(cervdat[,1])),2))
+
+#ctrl params
+ctrl_cerv <- trainControl(method="LGOCV", summaryFunction = twoClassSummary,
+                          classProbs = TRUE, savePredictions = TRUE, sampling = "down")
+
+# Models 
+## Generalized Linear Model (GLM)
+
+set.seed(222)
+cerv_glm <- caret::train(train_cerv, train_biopsy, method = "glm", trControl = ctrl_cerv,
+                         preProcess=c("center", "scale"), metric="ROC")
+cerv_glm
+
+cerv_glm.predictions <- predict(cerv_glm, cerv_predictors, type = "prob")
+cerv_glm.rocCurve <- pROC::roc(response = cerv_response, 
+                               predictor = cerv_glm.predictions[,1])
+cerv_glm.auc = cerv_glm.rocCurve$auc[1]
+cat('cerv_predictors glm AUC:', cerv_glm.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_glm <- predict(cerv_glm, test_cerv)
+confusionMatrix(cerv_pred_glm, test_biopsy)
+
+
+## Linear Discriminant Analysis (LDA)
+
+set.seed(222)
+cerv_lda <- caret::train(train_cerv, train_biopsy, method = "lda", trControl = ctrl_cerv,
+                         preProcess=c("center", "scale"), metric="ROC")
+cerv_lda
+
+cerv_lda.predictions <- predict(cerv_lda, cerv_predictors, type = "prob")
+cerv_lda.rocCurve <- pROC::roc(response = cerv_response, 
+                               predictor = cerv_lda.predictions[,1])
+cerv_lda.auc = cerv_lda.rocCurve$auc[1]
+cat('cerv_predictors lda AUC:', cerv_lda.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_lda <- predict(cerv_lda, test_cerv)
+confusionMatrix(cerv_pred_lda, test_biopsy)
+
+## Mixture Discriminant Analysis (MDA)
+set.seed(222)
+mdaGrid <- expand.grid(.subclasses = 1:8)
+cerv_mda <- train(train_cerv, train_biopsy, method = "mda",
+                  preProc = c("center", "scale"), tuneGrid = mdaGrid,
+                  metric = "ROC", trControl = ctrl_cerv)
+cerv_mda
+
+cerv_mda.predictions <- predict(cerv_mda, cerv_predictors, type = "prob")
+cerv_mda.rocCurve <- pROC::roc(response = cerv_response, 
+                               predictor = cerv_mda.predictions[,1])
+cerv_mda.auc = cerv_mda.rocCurve$auc[1]
+cat('cerv_predictors mda AUC:', cerv_mda.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_mda <- predict(cerv_mda, test_cerv)
+confusionMatrix(cerv_pred_mda, test_biopsy)
+
+## Partial Least Squares Discriminant Analysis (PLSDA)
+
+set.seed(222)
+plsGrid = expand.grid(.ncomp = 1:10)
+# Train a PLSDA - Partial Least Squares Discriminant Analysis Model
+cerv_plsda <- train(train_cerv, train_biopsy, method = "pls", tuneGrid = plsGrid,
+                    preProc = c("center","scale"), metric = "ROC", trControl = ctrl_cerv)
+cerv_plsda
+
+cerv_plsda.predictions <- predict(cerv_plsda, cerv_predictors, type = "prob")
+cerv_plsda.rocCurve <- pROC::roc(response = cerv_response, 
+                                 predictor = cerv_plsda.predictions[,1])
+cerv_plsda.auc = cerv_plsda.rocCurve$auc[1]
+cat('cerv_predictors plsda AUC:', cerv_plsda.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_plsda <- predict(cerv_plsda, test_cerv)
+confusionMatrix(cerv_pred_plsda, test_biopsy)
+
+
+## Nearest Shrunken Centroids (NSC)
+nscGrid <- data.frame(.threshold = 0:10)
+set.seed(222)
+cerv_nsc <- train(train_cerv, train_biopsy, method = "pam",
+                  preProc = c("center", "scale"), tuneGrid = nscGrid,
+                  metric = "ROC", trControl = ctrl_cerv)
+cerv_nsc
+
+cerv_nsc.predictions <- predict(cerv_nsc, cerv_predictors, type = "prob")
+cerv_nsc.rocCurve <- pROC::roc(response = cerv_response, 
+                               predictor = cerv_nsc.predictions[,1])
+cerv_nsc.auc = cerv_nsc.rocCurve$auc[1]
+cat('cerv_predictors NSC AUC:', cerv_nsc.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_nsc <- predict(cerv_nsc, test_cerv)
+confusionMatrix(cerv_pred_nsc, test_biopsy)
+
+
+## Neural Network
+set.seed(222)
+nnetGrid <- expand.grid(size=1:3, decay=c(0,0.1,1,2))
+cerv_nnet <- train(train_cerv, train_biopsy, method = "nnet",
+                   preProc = c("center", "scale", "spatialSign"), tuneGrid = nnetGrid,
+                   metric = "ROC", trace = FALSE,
+                   maxit = 2000, trControl = ctrl_cerv)
+cerv_nnet
+
+cerv_nnet.predictions <- predict(cerv_nnet, cerv_predictors, type = "prob")
+cerv_nnet.rocCurve <- pROC::roc(response = cerv_response, 
+                                predictor = cerv_nnet.predictions[,1])
+cerv_nnet.auc = cerv_nnet.rocCurve$auc[1]
+cat('cerv_predictors mda AUC:', cerv_nnet.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_nnet <- predict(cerv_nnet, test_cerv)
+confusionMatrix(cerv_pred_nnet, test_biopsy)
+
+## GLMNET 
+set.seed(222)
+cerv_glmnet.grid <- expand.grid(.alpha = c(0, .1, .2, .4, .6, .8, 1),
+                                .lambda = seq(.01, .2, length = 40))
+cerv_glmnet <- caret::train(train_cerv, y = train_biopsy, method = "glmnet", 
+                            tuneGrid = cerv_glmnet.grid, trControl = ctrl_cerv, 
+                            preProc = c("center", "scale"), metric = "ROC")
+
+cerv_glmnet.predictions <- predict(cerv_glmnet, cerv_predictors, type = "prob")
+cerv_glmnet.rocCurve <- pROC::roc(response = cerv_response,
+                                  predictor = cerv_glmnet.predictions[,1])
+cerv_glmnet.auc = cerv_glmnet.rocCurve$auc[1]
+cat('cerv_predictors GLMNET AUC:', cerv_glmnet.auc, "\n", "\n")
+# Predict on testing set
+cerv_pred_glmnet <- predict(cerv_glmnet, test_cerv)
+confusionMatrix(cerv_pred_glmnet, test_biopsy)
+
+## Random Forest
+set.seed(222)
+cerv_rf <- caret::train(train_cerv, y = train_biopsy, method = "rf",
+                        trControl = ctrl_cerv, preProc = c("center", "scale"), metric = "ROC")
+cerv_rf
+cerv_rf.predictions <- predict(cerv_rf, cerv_predictors, type = "prob")
+cerv_rf.rocCurve <- pROC::roc(response = cerv_response,
+                              predictor = cerv_rf.predictions[,1])
+cerv_rf.auc = cerv_rf.rocCurve$auc[1]
+cat('cerv_predictors Random Forest AUC:', cerv_rf.auc, "\n", "\n")
+# Predict on testing set
+cerv_pred_rf <- predict(cerv_rf, test_cerv)
+confusionMatrix(cerv_pred_rf, test_biopsy)
+
+
+## K - Nearest Neighbors (KNN) 
+set.seed(222)
+cerv_knn <- train(train_cerv, train_biopsy, method = "knn", trControl = ctrl_cerv,
+                  preProcess=c("center", "scale"), metric="ROC")
+cerv_knn
+
+cerv_knn.predictions <- predict(cerv_knn, cerv_predictors, type = "prob")
+cerv_knn.rocCurve <- pROC::roc(response = cerv_response, 
+                               predictor = cerv_knn.predictions[,1])
+cerv_knn.auc = cerv_knn.rocCurve$auc[1]
+cat('cerv_predictors KNN AUC:', cerv_knn.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_knn <- predict(cerv_knn, test_cerv)
+confusionMatrix(cerv_pred_knn, test_biopsy)
+
+## Naive Bayes 
+set.seed(222)
+cerv_nb <- caret::train(train_cerv, train_biopsy, method = "nb", trControl = ctrl_cerv,
+                        preProcess=c("center", "scale"), metric="ROC")
+cerv_nb
+
+cerv_nb.predictions <- predict(cerv_nb, cerv_predictors, type = "prob")
+cerv_nb.rocCurve <- pROC::roc(response = cerv_response, 
+                              predictor = cerv_nb.predictions[,1])
+cerv_nb.auc = cerv_nb.rocCurve$auc[1]
+cat('cerv_predictors lda AUC:', cerv_nb.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_nb <- predict(cerv_nb, test_cerv)
+confusionMatrix(cerv_pred_nb, test_biopsy)
+
+
+## Support Vector Machines
+set.seed(222)
+sigmaEst <- kernlab::sigest(as.matrix(cerv_predictors))
+svmGrid <- expand.grid(sigma=sigmaEst[1], C=2^seq(-4, 4))
+
+cerv_svm <- train(train_cerv, train_biopsy, method = "svmRadial", 
+                  tuneGrid = svmGrid, preProcess = c("center", "scale"), 
+                  metric="ROC", fit = FALSE, trControl = ctrl_cerv)
+cerv_svm
+
+cerv_svm.predictions <- predict(cerv_svm, cerv_predictors, type = "prob")
+cerv_svm.rocCurve <- pROC::roc(response = cerv_response, 
+                               predictor = cerv_svm.predictions[,1])
+cerv_svm.auc = cerv_svm.rocCurve$auc[1]
+cat('cerv_predictors SVM AUC:', cerv_svm.auc, "\n", "\n")
+
+# Predict on testing set
+cerv_pred_svm <- predict(cerv_svm, test_cerv)
+confusionMatrix(cerv_pred_svm, test_biopsy)
+
+# Model Train and Test Variables
+cerv_glm_opt <- which.max(cerv_glm$results[,"ROC"])
+cerv_glm_roc_train <- cerv_glm$results[cerv_glm_opt,"ROC"]
+cerv_glm_sens_train <- cerv_glm$results[cerv_glm_opt,"Sens"]
+cerv_glm_spec_train <- cerv_glm$results[cerv_glm_opt,"Spec"]
+cerv_glm_accur <- Accuracy(cerv_pred_glm, test_biopsy)
+cerv_glm_sens <- sensitivity(cerv_pred_glm, test_biopsy)
+cerv_glm_spec <- specificity(cerv_pred_glm, test_biopsy)
+
+cerv_lda_opt <- which.max(cerv_lda$results[,"ROC"])
+cerv_lda_roc_train <- cerv_lda$results[cerv_lda_opt,"ROC"]
+cerv_lda_sens_train <- cerv_lda$results[cerv_lda_opt,"Sens"]
+cerv_lda_spec_train <- cerv_lda$results[cerv_lda_opt,"Spec"]
+cerv_lda_accur <- Accuracy(cerv_pred_lda, test_biopsy)
+cerv_lda_sens <- sensitivity(cerv_pred_lda, test_biopsy)
+cerv_lda_spec <- specificity(cerv_pred_lda, test_biopsy)
+
+cerv_mda_opt <- which.max(cerv_mda$results[,"ROC"])
+cerv_mda_roc_train <- cerv_mda$results[cerv_mda_opt,"ROC"]
+cerv_mda_sens_train <- cerv_mda$results[cerv_mda_opt,"Sens"]
+cerv_mda_spec_train <- cerv_mda$results[cerv_mda_opt,"Spec"]
+cerv_mda_accur <- Accuracy(cerv_pred_mda, test_biopsy)
+cerv_mda_sens <- sensitivity(cerv_pred_mda, test_biopsy)
+cerv_mda_spec <- specificity(cerv_pred_mda, test_biopsy)
+
+cerv_plsda_opt <- which.max(cerv_plsda$results[,"ROC"])
+cerv_plsda_roc_train <- cerv_plsda$results[cerv_plsda_opt,"ROC"]
+cerv_plsda_sens_train <- cerv_plsda$results[cerv_plsda_opt,"Sens"]
+cerv_plsda_spec_train <- cerv_plsda$results[cerv_plsda_opt,"Spec"]
+cerv_plsda_accur <- Accuracy(cerv_pred_plsda, test_biopsy)
+cerv_plsda_sens <- sensitivity(cerv_pred_plsda, test_biopsy)
+cerv_plsda_spec <- specificity(cerv_pred_plsda, test_biopsy)
+
+cerv_nsc_opt <- which.max(cerv_nsc$results[,"ROC"])
+cerv_nsc_roc_train <- cerv_nsc$results[cerv_nsc_opt,"ROC"]
+cerv_nsc_sens_train <- cerv_nsc$results[cerv_nsc_opt,"Sens"]
+cerv_nsc_spec_train <- cerv_nsc$results[cerv_nsc_opt,"Spec"]
+cerv_nsc_accur <- Accuracy(cerv_pred_nsc, test_biopsy)
+cerv_nsc_sens <- sensitivity(cerv_pred_nsc, test_biopsy)
+cerv_nsc_spec <- specificity(cerv_pred_nsc, test_biopsy)
+
+cerv_glmnet_opt <- which.max(cerv_glmnet$results[,"ROC"])
+cerv_glmnet_roc_train <- cerv_glmnet$results[cerv_glmnet_opt,"ROC"]
+cerv_glmnet_sens_train <- cerv_glmnet$results[cerv_glmnet_opt,"Sens"]
+cerv_glmnet_spec_train <- cerv_glmnet$results[cerv_glmnet_opt,"Spec"]
+cerv_glmnet_accur <- Accuracy(cerv_pred_glmnet, test_biopsy)
+cerv_glmnet_sens <- sensitivity(cerv_pred_glmnet, test_biopsy)
+cerv_glmnet_spec <- specificity(cerv_pred_glmnet, test_biopsy)
+
+cerv_rf_opt <- which.max(cerv_rf$results[,"ROC"])
+cerv_rf_roc_train <- cerv_rf$results[cerv_rf_opt,"ROC"]
+cerv_rf_sens_train <- cerv_rf$results[cerv_rf_opt,"Sens"]
+cerv_rf_spec_train <- cerv_rf$results[cerv_rf_opt,"Spec"]
+cerv_rf_accur <- Accuracy(cerv_pred_rf, test_biopsy)
+cerv_rf_sens <- sensitivity(cerv_pred_rf, test_biopsy)
+cerv_rf_spec <- specificity(cerv_pred_rf, test_biopsy)
+
+cerv_nnet_opt <- which.max(cerv_nnet$results[,"ROC"])
+cerv_nnet_roc_train <- cerv_nnet$results[cerv_nnet_opt,"ROC"]
+cerv_nnet_sens_train <- cerv_nnet$results[cerv_nnet_opt,"Sens"]
+cerv_nnet_spec_train <- cerv_nnet$results[cerv_nnet_opt,"Spec"]
+cerv_nnet_accur <- Accuracy(cerv_pred_nnet, test_biopsy)
+cerv_nnet_sens <- sensitivity(cerv_pred_nnet, test_biopsy)
+cerv_nnet_spec <- specificity(cerv_pred_nnet, test_biopsy)
+
+cerv_knn_opt <- which.max(cerv_knn$results[,"ROC"])
+cerv_knn_roc_train <- cerv_knn$results[cerv_knn_opt,"ROC"]
+cerv_knn_sens_train <- cerv_knn$results[cerv_knn_opt,"Sens"]
+cerv_knn_spec_train <- cerv_knn$results[cerv_knn_opt,"Spec"]
+cerv_knn_accur <- Accuracy(cerv_pred_knn, test_biopsy)
+cerv_knn_sens <- sensitivity(cerv_pred_knn, test_biopsy)
+cerv_knn_spec <- specificity(cerv_pred_knn, test_biopsy)
+
+cerv_nb_opt <- which.max(cerv_nb$results[,"ROC"])
+cerv_nb_roc_train <- cerv_nb$results[cerv_nb_opt,"ROC"]
+cerv_nb_sens_train <- cerv_nb$results[cerv_nb_opt,"Sens"]
+cerv_nb_spec_train <- cerv_nb$results[cerv_nb_opt,"Spec"]
+cerv_nb_accur <- Accuracy(cerv_pred_nb, test_biopsy)
+cerv_nb_sens <- sensitivity(cerv_pred_nb, test_biopsy)
+cerv_nb_spec <- specificity(cerv_pred_nb, test_biopsy)
+
+cerv_svm_opt <- which.max(cerv_svm$results[,"ROC"])
+cerv_svm_roc_train <- cerv_svm$results[cerv_svm_opt,"ROC"]
+cerv_svm_sens_train <- cerv_svm$results[cerv_svm_opt,"Sens"]
+cerv_svm_spec_train <- cerv_svm$results[cerv_svm_opt,"Spec"]
+cerv_svm_accur <- Accuracy(cerv_pred_svm, test_biopsy)
+cerv_svm_sens <- sensitivity(cerv_pred_svm, test_biopsy)
+cerv_svm_spec <- specificity(cerv_pred_svm, test_biopsy)
+
+
+cerv_models <- c("Generalized Linear Model","Linear Discriminant Analysis",
+                 "Mixture Discriminant Analysis",
+                 "PLSDA",
+                 "Nearest Shrunken Centroids","GLMNET","Random Forest","Neural Network",
+                 "K-Nearest Neighbors", 
+                 "Naive Bayes", "Support Vector Machines")
+# Create Columns for Training Data
+roc <- c(cerv_glm_roc_train,cerv_lda_roc_train,cerv_mda_roc_train,cerv_plsda_roc_train,
+         cerv_nsc_roc_train,cerv_glmnet_roc_train,cerv_rf_roc_train,cerv_nnet_roc_train,
+         cerv_knn_roc_train,cerv_nb_roc_train,cerv_svm_roc_train)
+auc <- c(cerv_glm.auc,cerv_lda.auc,cerv_mda.auc,cerv_plsda.auc,cerv_nsc.auc,
+         cerv_glmnet.auc,cerv_rf.auc,cerv_nnet.auc,cerv_knn.auc,cerv_nb.auc,cerv_svm.auc)
+senstr <- c(cerv_glm_sens_train,cerv_lda_sens_train,cerv_mda_sens_train,
+            cerv_plsda_sens_train,cerv_nsc_sens_train,cerv_glmnet_sens_train,
+            cerv_rf_sens_train,cerv_nnet_sens_train,cerv_knn_sens_train,
+            cerv_nb_sens_train,cerv_svm_sens_train)
+spectr <- c(cerv_glm_spec_train,cerv_lda_spec_train,cerv_mda_spec_train,
+            cerv_plsda_spec_train,cerv_nsc_spec_train,cerv_glmnet_spec_train,
+            cerv_rf_spec_train, cerv_nnet_spec_train,cerv_knn_spec_train,
+            cerv_nb_spec_train,cerv_svm_spec_train)
+# Create Columns for Testing Data
+accutest <- c(cerv_glm_accur,cerv_lda_accur,cerv_mda_accur,cerv_plsda_accur,
+              cerv_nsc_accur,cerv_glmnet_accur,cerv_rf_accur,cerv_nnet_accur,
+              cerv_knn_accur,cerv_nb_accur,cerv_svm_accur)
+senstest <- c(cerv_glm_sens,cerv_lda_sens,cerv_mda_sens,cerv_plsda_sens,cerv_nsc_sens,
+              cerv_glmnet_sens,cerv_rf_sens,cerv_nnet_sens,cerv_knn_sens,cerv_nb_sens,
+              cerv_svm_sens)
+spectest <- c(cerv_glm_spec,cerv_lda_spec,cerv_mda_spec,cerv_plsda_spec,cerv_nsc_spec,
+              cerv_glmnet_spec,cerv_rf_spec,cerv_nnet_spec,cerv_knn_spec,cerv_nb_spec,cerv_svm_spec)
+# Parse Training and Testing data into pander table columns
+table2 <- data.frame(cerv_models,roc,auc,senstr,spectr)
+table3 <- data.frame(cerv_models,accutest,senstest,spectest)
+colnames(table2) <- c("Model","ROC","AUC","Sensitivity Train","Specificity Train")
+colnames(table3) <- c("Model","Accuracy Test","Sensitivity Test","Specificity Test")
+table2 %>% pander(style = "simple", split.table = Inf, justify = "left",
+                  caption="Model Comparison For Train and Test")
+table3 %>% pander(style = "simple", split.table = Inf, justify = "left",
+                  caption="Model Comparison For Train and Test")
+
+plot(cerv_glm.rocCurve, col = "green", 
+     main = "ROC Comparison for Cervical Cancer Predictors", 
+     xlab= "1 - Specificity", ylab="Sensitivity")
+legend("bottomright", legend=c("Generalized Linear Model","Linear Discriminant Analysis",
+                               "Mixture Discriminant Analysis",
+                               "Partial Least Squares Discriminant Analysis",
+                               "Nearest Shrunken Centroids","Neural Network","GLMNET","Random Forest",
+                               "K-Nearest Neighbors", "Naive Bayes", "Support Vector Machines"),
+       col=c("green","red","blue","brown","orange","darkgreen","lightseagreen","black", 
+             "deeppink", "purple","grey50"), 
+       lty=1:2, cex=0.8)
+plot(cerv_lda.rocCurve, col = "red", add = TRUE)
+plot(cerv_mda.rocCurve, col = "blue", add = TRUE)
+plot(cerv_plsda.rocCurve, col = "brown", add = TRUE)
+plot(cerv_nsc.rocCurve, col = "orange", add = TRUE)
+plot(cerv_nnet.rocCurve, col = "darkgreen", add = TRUE)
+plot(cerv_glmnet.rocCurve, col = "lightseagreen", add = TRUE)
+plot(cerv_rf.rocCurve, col = "black", add = TRUE)
+plot(cerv_knn.rocCurve, col = "deeppink", add = TRUE)
+plot(cerv_nb.rocCurve, col = "purple", add = TRUE)
+plot(cerv_svm.rocCurve, col = "grey50", add = TRUE)
+
+
+
+model_metrics_train <- c("ROC", "AUC", "Sensitivity", "Specificity")
+model_metrics_test <- c("Accuracy", "Sensitivity", "Specificity")
+
+# Minimums and Maximums (Trained Models)
+min_roc <- min(roc); max_roc <- max(roc)
+min_auc <- min(auc); max_auc <- max(auc)
+min_sens_train <- min(senstr); max_sens_train <- max(senstr)
+min_spec_train <- min(spectr); max_spec_train <- max(spectr)
+
+mean_roc <- mean(roc)
+mean_auc <- mean(auc)
+mean_sens_train <- mean(senstr)
+mean_spec_train <- mean(spectr)
+
+min_roc_name <- table2[which.min(table2$ROC),1]
+min_auc_name <- table2[which.min(table2$AUC),1]
+min_sens_train_name <- table2[which.min(table2$`Sensitivity Train`),1]
+min_spec_train_name <- table2[which.min(table2$`Specificity Train`),1]
+
+max_roc_name <- table2[which.max(table2$ROC),1]
+max_auc_name <- table2[which.max(table2$AUC),1]
+max_sens_train_name <- table2[which.max(table2$`Sensitivity Train`),1]
+max_spec_train_name <- table2[which.max(table2$`Specificity Train`),1]
+
+# Minimums and Maximums (Tested Models)
+min_accutest <- min(accutest); max_accutest <- max(accutest)
+min_senstest <- min(senstest); max_senstest <- max(senstest)
+min_spectest <- min(spectest); max_spectest <- max(spectest)
+
+mean_accutest <- mean(accutest)
+mean_senstest <- mean(senstest)
+mean_spectest <- mean(spectest)
+
+min_accutest_name <- table3[which.min(table3$`Accuracy Test`),1]
+min_sens_test_name <- table2[which.min(table3$`Sensitivity Test`),1]
+min_spec_test_name <- table2[which.min(table3$`Specificity Test`),1]
+
+max_accutest_name <- table3[which.max(table3$`Accuracy Test`),1]
+max_sens_test_name <- table2[which.max(table3$`Sensitivity Test`),1]
+max_spec_test_name <- table2[which.max(table3$`Specificity Test`),1]
+
+#Parse Columns into table
+min_train <- c(min_roc,min_auc,min_sens_train,min_spec_train)
+mean_train <- c(mean_roc,mean_auc,mean_sens_train,mean_spec_train)
+max_train <- c(max_roc,max_auc,max_sens_train,max_spec_train)
+min_train_names <- c(min_roc_name,min_auc_name,min_sens_train_name,min_spec_train_name)
+max_train_names <- c(max_roc_name,max_auc_name,max_sens_train_name,max_spec_train_name)
+
+min_test <- c(min_accutest,min_senstest,min_spectest)
+mean_test <- c(mean_accutest,mean_senstest,mean_spectest)
+max_test <- c(max_accutest,max_senstest,max_spectest)
+min_test_names <- c(min_sens_test_name,min_sens_test_name,min_spec_test_name)
+max_test_names <- c(max_accutest_name,max_sens_test_name,max_spec_test_name)
+
+table4 <- data.frame(model_metrics_train,min_train,mean_train,max_train,
+                     min_train_names,max_train_names)
+table5 <- data.frame(model_metrics_test,min_test,mean_test,max_test,
+                     min_test_names,max_test_names)
+colnames(table4) <- c("Model Metrics","Minimum","Mean","Maximum", "Model with Min.", 
+                      "Model with Max")
+colnames(table5) <- c("Model Metrics","Minimum","Mean","Maximum", "Model with Min",
+                      "Model with Max")
+table4 %>% pander(style = "simple", split.table = Inf, justify = "left",
+                  caption = "Model Comparison Summary - Train")
+table5 %>% pander(style = "simple", split.table = Inf, justify = "left",
+                  caption = "Model Comparison Summary - Test")
+
+plot(varImp(cerv_plsda), top = 5, main = "Variable Importance using the PLSDA Model")
+plot(varImp(cerv_glm), top = 5, main = "Variable Importance using the GLM Model")
+plot(varImp(cerv_rf), top = 5, main = "Variable Importance using the Random Forest Model")
+plot(varImp(cerv_nb), top = 5, main = "Variable Importance using the Naive Bayes Model")
+
+
+cerv_log <- glm(train_biopsy ~., data = train_cerv, family = binomial)
+summary(cerv_log)
+coef_log <- coef(summary(cerv_log))[,'Pr(>|z|)']
+min_coef_log <- Rfast::nth(coef_log, 2, descending = F) # 2nd min (first is intercept)
+
+# Operating the generalized linear model (logistic regression) on the training set 
+# of the data uncovered only one statistically significant predictor 
+# (Hormonal.Contraceptives..years.) with a $p$-value of  `r min_coef_log`.}
+
+# $$\hat{p}(y) = \frac{\text{exp}(b_0+b_1x_1+\cdot\cdot\cdot+b_px_p)}{1+\text{exp}(b_0+b_1x_1+\cdot\cdot\cdot+b_px_p)}$$ 
+# $$\hat{p}(y) = \frac{\text{exp}(b_0+b_1(Hormonal.Contraceptives..years.)}{1+\text{exp}(b_0+b_1(Hormonal.Contraceptives..years.)}$$
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+
